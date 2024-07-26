@@ -5,6 +5,7 @@ import numpy as np
 from scipy.spatial.distance import cdist
 from collections import Counter, defaultdict
 from PIL import Image
+import time
 
 
 # 모델 파일명 리스트(밴: model10)
@@ -202,6 +203,9 @@ def start_camera():
 container = st.container()
 container.button("Camera Start", on_click=start_camera, use_container_width=True)
 
+# 라벨 지속 시간 추적을 위한 딕셔너리
+label_timers = defaultdict(lambda: None)
+
 def show_camera():
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
@@ -233,6 +237,21 @@ def show_camera():
                 cv2.putText(frame, f'{label_name} {conf:.2f}', (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36, 255, 12), 2)
 
                 detected_labels.add(label_name)
+
+                # 라벨의 타이머 갱신
+                if label_name not in label_timers:
+                    label_timers[label_name] = time.time()
+                elif time.time() - label_timers[label_name] >= 2:
+                    st.session_state.button_clicked = False
+                    cap.release()
+                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    capture_image = Image.fromarray(frame_rgb)
+                    placeholder.image(capture_image, use_column_width=True)
+                    return
+            # 예측되지 않은 라벨에 대해 타이머 초기화
+            for label_name in list(label_timers):
+                if label_name not in detected_labels:
+                    del label_timers[label_name]
 
         # 프레임을 BGR에서 RGB로 변환
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
